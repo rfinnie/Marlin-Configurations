@@ -5,14 +5,18 @@ set -e
 SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 CONFIG_DIR="$(dirname "$(dirname "${SCRIPT_DIR}")")"
 if [ -e "${CONFIG_DIR}/Marlin/platformio.ini" ]; then
+    # "Marlin" subdirectory checkout of configurations
     MARLIN_DIR="${CONFIG_DIR}/Marlin"
 else
+    # "Marlin" checkout parallel to configurations
     MARLIN_DIR="$(dirname "${CONFIG_DIR}")/Marlin"
 fi
 if [ "${GITHUB_ACTIONS}" = "true" ]; then
     ARTIFACTS_DIR="${CONFIG_DIR}/.artifacts"
 fi
 
+# All Marlin Python scripts are python3-compatible, but most have a
+# "python" shebang.  For python3-only envs, set up a workaround.
 if ! command -v python >/dev/null; then
     TMPBIN="$(mktemp -d)"
     ln -sf "$(command -v python3)" "${TMPBIN}/python"
@@ -33,81 +37,62 @@ CURRENT_BRANCH_REV="$(git -C "${MARLIN_DIR}" log --format="%h" -n 1 HEAD)"
 CURRENT_BRANCH_DATE="$(git -C "${MARLIN_DIR}" show -s --format=%ci HEAD | perl -ne '/^(\d{4})-(\d{2})-(\d{2})/ && print $1 . $2 . $3')"
 
 if [ "${ENVIRONMENT}" = "e3v2" ]; then
-    if ! grep -q "env:e3v2" "${MARLIN_DIR}/platformio.ini"; then
-        cat <<"EOM" >>"${MARLIN_DIR}/platformio.ini"
-
+    CONF_H="${CONFIG_DIR}/config/examples/Creality/Ender-3 V2/Configuration.h"
+    CONF_ADV_H="${CONFIG_DIR}/config/examples/Creality/Ender-3 V2/Configuration_adv.h"
+    MACHINE_UUID="cc4afbb5-716f-4b2b-ad1a-90ba720b1b8a"
+    PIO_DEF="
 [env:e3v2]
 extends = env:STM32F103RET6_creality
-build_flags = ${env:STM32F103RET6_creality.build_flags} -DCUSTOM_VERSION_FILE=_Version.h
-EOM
-    fi
-    cp \
-        "${CONFIG_DIR}/config/examples/Creality/Ender-3 V2/Configuration.h" \
-        "${CONFIG_DIR}/config/examples/Creality/Ender-3 V2/Configuration_adv.h" \
-        "${MARLIN_DIR}/Marlin/"
-    env \
-        READ_FILE="${MARLIN_DIR}/Marlin/Version.h" \
-        WRITE_FILE="${MARLIN_DIR}/Marlin/_Version.h" \
-        STRING_DISTRIBUTION_DATE="${NOW}" \
-        SHORT_BUILD_VERSION="${NOWSHORT}" \
-        DETAILED_BUILD_VERSION="${CURRENT_BRANCH}-${CURRENT_BRANCH_DATE}-g${CURRENT_BRANCH_REV} (config ${CONFIG_BRANCH}-${CONFIG_BRANCH_DATE}-g${CONFIG_BRANCH_REV})" \
-        SOURCE_CODE_URL="github.com/rfinnie/Marlin" \
-        DEFAULT_MACHINE_UUID="cc4afbb5-716f-4b2b-ad1a-90ba720b1b8a" \
-        WEBSITE_URL="finnie.org" \
-        "${MARLIN_DIR}/buildroot/bin/generate_version"
-
-    platformio run --project-dir "${MARLIN_DIR}" --environment e3v2 --target clean
-    platformio run --project-dir "${MARLIN_DIR}" --environment e3v2
-
-    if [ -n "${ARTIFACTS_DIR}" ]; then
-        mkdir -p "${ARTIFACTS_DIR}/e3v2"
-        cp \
-            "${MARLIN_DIR}/Marlin/_Version.h" \
-            "${MARLIN_DIR}/Marlin/Configuration.h" \
-            "${MARLIN_DIR}/Marlin/Configuration_adv.h" \
-            "${MARLIN_DIR}/.pio/build/e3v2"/*.bin \
-            "${ARTIFACTS_DIR}/e3v2/"
-    fi
-
+build_flags = \${env:STM32F103RET6_creality.build_flags} -DCUSTOM_VERSION_FILE=_Version.h
+"
 elif [ "${ENVIRONMENT}" = "wdi3p" ]; then
-    if ! grep -q "env:wdi3p" "${MARLIN_DIR}/platformio.ini"; then
-        cat <<"EOM" >>"${MARLIN_DIR}/platformio.ini"
-
+    CONF_H="${CONFIG_DIR}/config/examples/Wanhao/Duplicator i3 Plus/Configuration.h"
+    CONF_ADV_H="${CONFIG_DIR}/config/examples/Wanhao/Duplicator i3 Plus/Configuration_adv.h"
+    MACHINE_UUID="c6924ed2-0bc7-4066-9142-31dcfeb17d2e"
+    PIO_DEF="
 [env:wdi3p]
 extends = env:mega2560
-build_flags = ${env:mega2560.build_flags} -DCUSTOM_VERSION_FILE=_Version.h
-extra_scripts = ${env:mega2560.extra_scripts}
+build_flags = \${env:mega2560.build_flags} -DCUSTOM_VERSION_FILE=_Version.h
+extra_scripts = \${env:mega2560.extra_scripts}
   pre:buildroot/share/PlatformIO/scripts/random-bin.py
-EOM
-    fi
+"
+fi
+
+if ! grep -q "env:${ENVIRONMENT}" "${MARLIN_DIR}/platformio.ini"; then
+    echo "${PIO_DEF}" >>"${MARLIN_DIR}/platformio.ini"
+fi
+
+cp "${CONF_H}" "${CONF_ADV_H}" "${MARLIN_DIR}/Marlin/"
+
+env \
+    READ_FILE="${MARLIN_DIR}/Marlin/Version.h" \
+    WRITE_FILE="${MARLIN_DIR}/Marlin/_Version.h" \
+    STRING_DISTRIBUTION_DATE="${NOW}" \
+    SHORT_BUILD_VERSION="${NOWSHORT}" \
+    DETAILED_BUILD_VERSION="${CURRENT_BRANCH}-${CURRENT_BRANCH_DATE}-g${CURRENT_BRANCH_REV} (config ${CONFIG_BRANCH}-${CONFIG_BRANCH_DATE}-g${CONFIG_BRANCH_REV})" \
+    SOURCE_CODE_URL="github.com/rfinnie/Marlin" \
+    DEFAULT_MACHINE_UUID="${MACHINE_UUID}" \
+    WEBSITE_URL="finnie.org" \
+    "${MARLIN_DIR}/buildroot/bin/generate_version"
+
+platformio run --project-dir "${MARLIN_DIR}" --environment "${ENVIRONMENT}" --target clean
+platformio run --project-dir "${MARLIN_DIR}" --environment "${ENVIRONMENT}"
+
+if [ -n "${ARTIFACTS_DIR}" ]; then
+    mkdir -p "${ARTIFACTS_DIR}/${ENVIRONMENT}"
     cp \
-        "${CONFIG_DIR}/config/examples/Wanhao/Duplicator i3 Plus/Configuration.h" \
-        "${CONFIG_DIR}/config/examples/Wanhao/Duplicator i3 Plus/Configuration_adv.h" \
-        "${MARLIN_DIR}/Marlin/"
-    env \
-        READ_FILE="${MARLIN_DIR}/Marlin/Version.h" \
-        WRITE_FILE="${MARLIN_DIR}/Marlin/_Version.h" \
-        STRING_DISTRIBUTION_DATE="${NOW}" \
-        SHORT_BUILD_VERSION="${NOWSHORT}" \
-        DETAILED_BUILD_VERSION="${CURRENT_BRANCH}-${CURRENT_BRANCH_DATE}-g${CURRENT_BRANCH_REV} (config ${CONFIG_BRANCH}-${CONFIG_BRANCH_DATE}-g${CONFIG_BRANCH_REV})" \
-        SOURCE_CODE_URL="github.com/rfinnie/Marlin" \
-        DEFAULT_MACHINE_UUID="c6924ed2-0bc7-4066-9142-31dcfeb17d2e" \
-        WEBSITE_URL="finnie.org" \
-        "${MARLIN_DIR}/buildroot/bin/generate_version"
+        "${MARLIN_DIR}/Marlin/_Version.h" \
+        "${MARLIN_DIR}/Marlin/Configuration.h" \
+        "${MARLIN_DIR}/Marlin/Configuration_adv.h" \
+        "${ARTIFACTS_DIR}/${ENVIRONMENT}/"
 
-    platformio run --project-dir "${MARLIN_DIR}" --environment wdi3p --target clean
-    platformio run --project-dir "${MARLIN_DIR}" --environment wdi3p
+    diff -u "${CONFIG_DIR}/config/default/Configuration.h" "${MARLIN_DIR}/Marlin/Configuration.h" >"${ARTIFACTS_DIR}/${ENVIRONMENT}/Configuration.h.diff" || true
+    diff -u "${CONFIG_DIR}/config/default/Configuration_adv.h" "${MARLIN_DIR}/Marlin/Configuration_adv.h" >"${ARTIFACTS_DIR}/${ENVIRONMENT}/Configuration_adv.h.diff" || true
 
-    if [ -n "${ARTIFACTS_DIR}" ]; then
-        mkdir -p "${ARTIFACTS_DIR}/wdi3p"
-        cp \
-            "${MARLIN_DIR}/Marlin/_Version.h" \
-            "${MARLIN_DIR}/Marlin/Configuration.h" \
-            "${MARLIN_DIR}/Marlin/Configuration_adv.h" \
-            "${MARLIN_DIR}/.pio/build/wdi3p"/*.hex \
-            "${ARTIFACTS_DIR}/wdi3p/"
-    fi
-
+    for fw in "${MARLIN_DIR}/.pio/build/${ENVIRONMENT}"/*.bin "${MARLIN_DIR}/.pio/build/${ENVIRONMENT}"/*.hex; do
+        [ -e "${fw}" ] || continue
+        cp "${fw}" "${ARTIFACTS_DIR}/${ENVIRONMENT}/"
+    done
 fi
 
 if [ -n "${TMPBIN}" ]; then
