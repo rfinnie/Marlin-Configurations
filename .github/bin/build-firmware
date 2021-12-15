@@ -37,8 +37,8 @@ CURRENT_BRANCH_REV="$(git -C "${MARLIN_DIR}" log --format="%h" -n 1 HEAD)"
 CURRENT_BRANCH_DATE="$(git -C "${MARLIN_DIR}" show -s --format=%ci HEAD | perl -ne '/^(\d{4})-(\d{2})-(\d{2})/ && print $1 . $2 . $3')"
 
 if [ "${ENVIRONMENT}" = "e3v2" ]; then
-    CONF_H="${CONFIG_DIR}/config/examples/Creality/Ender-3 V2/Configuration.h"
-    CONF_ADV_H="${CONFIG_DIR}/config/examples/Creality/Ender-3 V2/Configuration_adv.h"
+    CONF_H="${CONFIG_DIR}/config/examples/Creality/Ender-3 V2/CrealityV422/CrealityUI/Configuration.h"
+    CONF_ADV_H="${CONFIG_DIR}/config/examples/Creality/Ender-3 V2/CrealityV422/CrealityUI/Configuration_adv.h"
     MACHINE_UUID="cc4afbb5-716f-4b2b-ad1a-90ba720b1b8a"
     PIO_DEF="
 [env:e3v2]
