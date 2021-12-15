@@ -36,33 +36,108 @@ CURRENT_BRANCH="$(git -C "${MARLIN_DIR}" rev-parse --abbrev-ref HEAD)"
 CURRENT_BRANCH_REV="$(git -C "${MARLIN_DIR}" log --format="%h" -n 1 HEAD)"
 CURRENT_BRANCH_DATE="$(git -C "${MARLIN_DIR}" show -s --format=%ci HEAD | perl -ne '/^(\d{4})-(\d{2})-(\d{2})/ && print $1 . $2 . $3')"
 
-if [ "${ENVIRONMENT}" = "e3v2" ]; then
-    CONF_H="${CONFIG_DIR}/config/examples/Creality/Ender-3 V2/CrealityV422/CrealityUI/Configuration.h"
-    CONF_ADV_H="${CONFIG_DIR}/config/examples/Creality/Ender-3 V2/CrealityV422/CrealityUI/Configuration_adv.h"
-    MACHINE_UUID="cc4afbb5-716f-4b2b-ad1a-90ba720b1b8a"
-    PIO_DEF="
+if ! grep -q "env:e3v2" "${MARLIN_DIR}/platformio.ini"; then
+    cat <<"EOM" >> "${MARLIN_DIR}/platformio.ini"
+
 [env:e3v2]
 extends = env:STM32F103RET6_creality
-build_flags = \${env:STM32F103RET6_creality.build_flags} -DCUSTOM_VERSION_FILE=_Version.h
-"
-elif [ "${ENVIRONMENT}" = "wdi3p" ]; then
-    CONF_H="${CONFIG_DIR}/config/examples/Wanhao/Duplicator i3 Plus/Configuration.h"
-    CONF_ADV_H="${CONFIG_DIR}/config/examples/Wanhao/Duplicator i3 Plus/Configuration_adv.h"
-    MACHINE_UUID="c6924ed2-0bc7-4066-9142-31dcfeb17d2e"
-    PIO_DEF="
+build_flags = ${env:STM32F103RET6_creality.build_flags} -DCUSTOM_VERSION_FILE=_Version.h
+
 [env:wdi3p]
 extends = env:mega2560
-build_flags = \${env:mega2560.build_flags} -DCUSTOM_VERSION_FILE=_Version.h
-extra_scripts = \${env:mega2560.extra_scripts}
+build_flags = ${env:mega2560.build_flags} -DCUSTOM_VERSION_FILE=_Version.h
+extra_scripts = ${env:mega2560.extra_scripts}
   pre:buildroot/share/PlatformIO/scripts/random-bin.py
-"
+EOM
 fi
 
-if ! grep -q "env:${ENVIRONMENT}" "${MARLIN_DIR}/platformio.ini"; then
-    echo "${PIO_DEF}" >>"${MARLIN_DIR}/platformio.ini"
-fi
+cd "${MARLIN_DIR}"
+PATH="${PATH}:${MARLIN_DIR}/buildroot/bin"
 
-cp "${CONF_H}" "${CONF_ADV_H}" "${MARLIN_DIR}/Marlin/"
+if [ "${ENVIRONMENT}" = "e3v2" ]; then
+    cp \
+        "${CONFIG_DIR}/config/examples/Creality/Ender-3 V2/CrealityV422/MarlinUI/Configuration.h" \
+        "${CONFIG_DIR}/config/examples/Creality/Ender-3 V2/CrealityV422/MarlinUI/Configuration_adv.h" \
+        "${MARLIN_DIR}/Marlin/"
+
+    opt_set STRING_CONFIG_H_AUTHOR '"(rfinnie)"'
+    opt_enable PID_EDIT_MENU
+    opt_enable PID_AUTOTUNE_MENU
+    opt_set DEFAULT_MAX_FEEDRATE '{ 500, 500, 12, 25 }'
+    opt_disable PROBE_MANUALLY
+    opt_enable BLTOUCH
+    opt_set NOZZLE_TO_PROBE_OFFSET '{ -42, -10, -2.00 }'
+    opt_set XY_PROBE_FEEDRATE '(120*60)'
+    opt_set Z_PROBE_FEEDRATE_FAST '(12*60)'
+    opt_set MULTIPLE_PROBING 2
+    opt_set Z_CLEARANCE_DEPLOY_PROBE 5
+    opt_set Z_CLEARANCE_BETWEEN_PROBES 2
+    opt_set Z_CLEARANCE_MULTI_PROBE 2
+    opt_enable Z_MIN_PROBE_REPEATABILITY_TEST
+    opt_enable AUTO_BED_LEVELING_BILINEAR
+    opt_enable DEBUG_LEVELING_FEATURE
+    opt_enable ABL_BILINEAR_SUBDIVISION
+    opt_enable LCD_BED_LEVELING
+    opt_enable LEVEL_BED_CORNERS
+    opt_enable Z_SAFE_HOMING
+    opt_set Z_SAFE_HOMING_X_POINT X_CENTER
+    opt_set Z_SAFE_HOMING_Y_POINT Y_CENTER
+    opt_set HOMING_FEEDRATE_MM_M '{ (60*60), (60*60), (12*60) }'
+    opt_set PREHEAT_1_TEMP_HOTEND 200
+    opt_set PREHEAT_1_TEMP_BED 60
+    opt_set PREHEAT_2_TEMP_HOTEND 235
+    opt_set PREHEAT_2_TEMP_BED 110
+    opt_disable NOZZLE_PARK_FEATURE
+    opt_disable DWIN_CREALITY_LCD
+    opt_disable DWIN_MARLINUI_LANDSCAPE
+    opt_enable DWIN_MARLINUI_PORTRAIT
+
+    opt_enable BABYSTEP_ZPROBE_OFFSET
+    opt_enable HOST_ACTION_COMMANDS
+    opt_enable HOST_PROMPT_SUPPORT
+
+    MACHINE_UUID="cc4afbb5-716f-4b2b-ad1a-90ba720b1b8a"
+elif [ "${ENVIRONMENT}" = "wdi3p" ]; then
+    cp \
+        "${CONFIG_DIR}/config/examples/Wanhao/Duplicator i3 Plus/Configuration.h" \
+        "${CONFIG_DIR}/config/examples/Wanhao/Duplicator i3 Plus/Configuration_adv.h" \
+        "${MARLIN_DIR}/Marlin/"
+
+    opt_set STRING_CONFIG_H_AUTHOR '"(rfinnie)"'
+    opt_set Z_MIN_ENDSTOP_INVERTING false
+    opt_set Z_MIN_PROBE_ENDSTOP_INVERTING false
+    opt_set DEFAULT_MAX_FEEDRATE '{ 450, 450, 12, 25 }'
+    opt_enable BLTOUCH
+    opt_set NOZZLE_TO_PROBE_OFFSET '{ -30, -46, -1.70 }'
+    opt_set XY_PROBE_FEEDRATE '(120*60)'
+    opt_set Z_PROBE_FEEDRATE_FAST '(12*60)'
+    opt_set MULTIPLE_PROBING 2
+    opt_set Z_CLEARANCE_DEPLOY_PROBE 5
+    opt_set Z_CLEARANCE_BETWEEN_PROBES 2
+    opt_set Z_CLEARANCE_MULTI_PROBE 2
+    opt_set Z_PROBE_OFFSET_RANGE_MIN -10
+    opt_set Z_PROBE_OFFSET_RANGE_MAX 10
+    opt_enable Z_MIN_PROBE_REPEATABILITY_TEST
+    opt_set Z_MAX_POS 174
+    opt_enable AUTO_BED_LEVELING_BILINEAR
+    opt_enable EXTRAPOLATE_BEYOND_GRID
+    opt_enable ABL_BILINEAR_SUBDIVISION
+    opt_enable Z_SAFE_HOMING
+    opt_set HOMING_FEEDRATE_MM_M '{ (60*60), (60*60), (12*60) }'
+    opt_enable EEPROM_AUTO_INIT
+    opt_set PREHEAT_1_TEMP_HOTEND 200
+    opt_set PREHEAT_1_TEMP_BED 60
+    opt_set PREHEAT_1_FAN_SPEED 255
+    opt_set PREHEAT_2_TEMP_HOTEND 235
+    opt_set PREHEAT_2_FAN_SPEED 255
+
+    opt_enable BABYSTEPPING
+    opt_enable BABYSTEP_ZPROBE_OFFSET
+    opt_enable HOST_ACTION_COMMANDS
+    opt_enable HOST_PROMPT_SUPPORT
+
+    MACHINE_UUID="c6924ed2-0bc7-4066-9142-31dcfeb17d2e"
+fi
 
 env \
     READ_FILE="${MARLIN_DIR}/Marlin/Version.h" \
